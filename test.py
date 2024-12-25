@@ -2,11 +2,15 @@ import streamlit as st
 from PIL import Image
 import numpy as np
 import pandas as pd
+import sklearn
 from sklearn.preprocessing import LabelEncoder, StandardScaler
-from sklearn.svm import SVC
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from sklearn.neural_network import MLPClassifier
 import pickle
 import matplotlib.pyplot as plt
+import sys
+
 
 # Custom CSS for the blue and white theme
 st.markdown("""
@@ -82,13 +86,28 @@ X[['Age', 'Academic Pressure', 'Study Satisfaction',
 # Train-test split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# Train an SVM model
-svm_model = SVC(kernel='linear', probability=True, random_state=42)
-svm_model.fit(X_train, y_train)
+# Neural network model using Scikit-learn
+model = MLPClassifier(hidden_layer_sizes=(128, 64), activation='relu', solver='adam', max_iter=200, random_state=42)
+
+# Train the model
+model.fit(X_train, y_train)
+
+# Evaluate the model
+accuracy = model.score(X_test, y_test)
+st.write(f"Test Accuracy: {accuracy * 100:.2f}%")
+
+# Confusion matrix
+y_pred = model.predict(X_test)
+cm = confusion_matrix(y_test, y_pred)
+st.subheader("Confusion Matrix")
+fig, ax = plt.subplots()
+disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=label_encoders['Depression'].classes_)
+disp.plot(ax=ax, cmap='Blues', values_format='d')
+st.pyplot(fig)
 
 # Save the model and components
-with open('svm_model.pkl', 'wb') as model_file:
-    pickle.dump(svm_model, model_file)
+with open('mlp_model.pkl', 'wb') as model_file:
+    pickle.dump(model, model_file)
 with open('label_encoders.pkl', 'wb') as encoders_file:
     pickle.dump(label_encoders, encoders_file)
 with open('scaler.pkl', 'wb') as scaler_file:
@@ -136,16 +155,13 @@ data_combined = np.hstack((numerical_data_scaled, categorical_data_reshaped))
 
 # Prediction
 if st.button("Predict"):
-    prediction = svm_model.predict(data_combined)[0]
-    prediction_proba = svm_model.predict_proba(data_combined)[0]
+    prediction = model.predict(data_combined)[0]
     result = label_encoders['Depression'].inverse_transform([prediction])[0]
 
     st.subheader("Prediction Result")
     st.write(f"Are you Depressed: **{result}**")
-    st.write(f"Depression: {prediction_proba[1]*100:.2f}%")
 
     if result == "Yes":  # Adjust based on your label encoding for "Depression"
         st.error("It seems like you might be experiencing depression. Please reach out for support. You can call the helpline: **(92) 0311 7786264** for immediate assistance.")
     else:
         st.success("You are not currently showing signs of depression. Keep maintaining a healthy lifestyle! Remember to take care of your mental health and seek support if you ever need it.")
-
